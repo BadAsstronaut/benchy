@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  python-fastapi:
+    build:
+      context: ./python-fastapi
+      dockerfile: Containerfile
+    container_name: benchmark-python
+    ports:
+      - "6000:6000"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 512M
+        reservations:
+          cpus: '1.0'
+          memory: 256M
+    restart: unless-stopped
+    networks:
+      - benchmark-net
+
+  php:
+    build:
+      context: ./php
+      dockerfile: Containerfile
+    container_name: benchmark-php
+    ports:
+      - "6001:6001"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 512M
+        reservations:
+          cpus: '1.0'
+          memory: 256M
+    restart: unless-stopped
+    networks:
+      - benchmark-net
+
+  golang-gin:
+    build:
+      context: ./golang-gin
+      dockerfile: Containerfile
+    container_name: benchmark-go
+    ports:
+      - "6002:6002"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 512M
+        reservations:
+          cpus: '1.0'
+          memory: 256M
+    restart: unless-stopped
+    networks:
+      - benchmark-net
+
+  cpp-crow:
+    build:
+      context: ./cpp-crow
+      dockerfile: Containerfile
+    container_name: benchmark-cpp
+    ports:
+      - "6003:6003"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 512M
+        reservations:
+          cpus: '1.0'
+          memory: 256M
+    restart: unless-stopped
+    networks:
+      - benchmark-net
+
+networks:
+  benchmark-net:
+    driver: bridge

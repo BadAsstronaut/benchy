@@ -1,0 +1,50 @@
+# Multi-stage build for C++ Crow
+FROM gcc:12 AS builder
+
+WORKDIR /build
+
+# Install CMake, git and dependencies
+RUN apt-get update && apt-get install -y \
+    cmake \
+    git \
+    python3 \
+    libasio-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Clone Crow and generate amalgamated header
+RUN git clone https://github.com/CrowCpp/Crow.git && \
+    cd Crow && \
+    python3 scripts/merge_all.py include crow_all.h && \
+    cp crow_all.h /build/ && \
+    cd .. && \
+    rm -rf Crow
+
+# Copy source files
+COPY CMakeLists.txt .
+COPY main.cpp .
+
+# Build the application
+RUN mkdir build && cd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release .. && \
+    cmake --build . --config Release
+
+# Final stage - minimal image with glibc compatibility
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y \
+    libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy binary from builder
+COPY --from=builder /build/build/benchmark_crow .
+
+EXPOSE 6003
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:6003/health || exit 1
+
+# Run the application
+CMD ["./benchmark_crow"]
