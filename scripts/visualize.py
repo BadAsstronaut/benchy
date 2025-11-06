@@ -136,7 +136,17 @@ def plot_throughput_comparison(df, output_dir):
     ax.set_xlabel('Test Level', fontsize=12)
     ax.set_title('Throughput Comparison Across All Levels', fontsize=14, fontweight='bold')
     ax.set_xticks(x + width * 1.5)
-    ax.set_xticklabels(['Hello World', 'Normal Work', 'CPU-Intensive', 'String Processing'])
+
+    # Create labels from actual level names
+    label_names = {
+        'level1_hello': 'Hello World',
+        'level2_normal': 'Normal Work',
+        'level3_cpu': 'CPU-Intensive',
+        'level4_strings': 'String Processing'
+    }
+    labels = [label_names.get(level, level.replace('_', ' ').title()) for level in levels]
+    ax.set_xticklabels(labels)
+
     ax.legend(loc='upper right')
     ax.grid(axis='y', alpha=0.3)
 
@@ -272,9 +282,12 @@ def plot_latency_heatmap(df, output_dir):
     """Create heatmap showing latency across services and levels."""
     pivot_data = df.pivot(index='Service', columns='Level', values='Mean_ms')
 
-    # Reorder columns
+    # Reorder columns if they exist, otherwise use what we have
     level_order = ['level1_hello', 'level2_normal', 'level3_cpu', 'level4_strings']
-    pivot_data = pivot_data[level_order]
+    existing_levels = [level for level in level_order if level in pivot_data.columns]
+    if existing_levels:
+        pivot_data = pivot_data[existing_levels]
+    # else keep all columns in their original order
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -286,8 +299,15 @@ def plot_latency_heatmap(df, output_dir):
     ax.set_xlabel('Test Level', fontsize=12)
     ax.set_ylabel('Service', fontsize=12)
 
-    # Format x-axis labels
-    ax.set_xticklabels(['Hello World', 'Normal Work', 'CPU-Intensive', 'String Processing'], rotation=45, ha='right')
+    # Format x-axis labels dynamically
+    label_names = {
+        'level1_hello': 'Hello World',
+        'level2_normal': 'Normal Work',
+        'level3_cpu': 'CPU-Intensive',
+        'level4_strings': 'String Processing'
+    }
+    col_labels = [label_names.get(col, col.replace('_', ' ').title()) for col in pivot_data.columns]
+    ax.set_xticklabels(col_labels, rotation=45, ha='right')
     ax.set_yticklabels([s.upper() for s in pivot_data.index], rotation=0)
 
     plt.tight_layout()
@@ -295,6 +315,179 @@ def plot_latency_heatmap(df, output_dir):
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"Created: {output_file}")
+
+def plot_container_metrics(results_dir, output_dir):
+    """Plot OS-level container resource metrics from collected CSV files."""
+    metrics_dir = os.path.join(results_dir, "metrics")
+
+    if not os.path.exists(metrics_dir):
+        print(f"No metrics directory found at {metrics_dir}")
+        return
+
+    # Find all metrics CSV files
+    import glob
+    metrics_files = glob.glob(os.path.join(metrics_dir, "*_metrics_*.csv"))
+
+    if not metrics_files:
+        print("No container metrics CSV files found")
+        return
+
+    print("\nProcessing container metrics...")
+
+    # Load all metrics data
+    metrics_data = {}
+    for file_path in metrics_files:
+        filename = os.path.basename(file_path)
+        # Extract service name (e.g., "python_metrics_20231105_123456.csv" -> "python")
+        service = filename.split('_metrics_')[0]
+
+        try:
+            df = pd.read_csv(file_path)
+            if not df.empty:
+                metrics_data[service] = df
+                print(f"  Loaded {len(df)} samples for {service}")
+        except Exception as e:
+            print(f"  Error loading {filename}: {e}")
+
+    if not metrics_data:
+        print("No valid metrics data found")
+        return
+
+    # 1. Memory Usage Over Time
+    fig, ax = plt.subplots(figsize=(14, 6))
+    colors = {'python': '#3498db', 'php': '#e74c3c', 'go': '#2ecc71', 'cpp': '#f39c12'}
+
+    for service, df in metrics_data.items():
+        ax.plot(df['elapsed_sec'], df['mem_usage_mb'],
+                label=service.upper(), linewidth=2,
+                color=colors.get(service, '#95a5a6'))
+
+    ax.set_xlabel('Time (seconds)', fontsize=12)
+    ax.set_ylabel('Memory Usage (MB)', fontsize=12)
+    ax.set_title('Memory Usage Over Time (OS-Level)', fontsize=14, fontweight='bold')
+    ax.legend(loc='best')
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    output_file = os.path.join(output_dir, 'memory_usage_timeline.png')
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Created: {output_file}")
+
+    # 2. CPU Usage Over Time
+    fig, ax = plt.subplots(figsize=(14, 6))
+
+    for service, df in metrics_data.items():
+        ax.plot(df['elapsed_sec'], df['cpu_percent'],
+                label=service.upper(), linewidth=2,
+                color=colors.get(service, '#95a5a6'))
+
+    ax.set_xlabel('Time (seconds)', fontsize=12)
+    ax.set_ylabel('CPU Usage (%)', fontsize=12)
+    ax.set_title('CPU Usage Over Time (OS-Level)', fontsize=14, fontweight='bold')
+    ax.legend(loc='best')
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    output_file = os.path.join(output_dir, 'cpu_usage_timeline.png')
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Created: {output_file}")
+
+    # 3. Memory Statistics Comparison
+    fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+    services = list(metrics_data.keys())
+
+    # Peak memory
+    peak_mem = [metrics_data[s]['mem_usage_mb'].max() for s in services]
+    axes[0].bar(services, peak_mem, color=[colors.get(s, '#95a5a6') for s in services])
+    axes[0].set_ylabel('Memory (MB)')
+    axes[0].set_title('Peak Memory Usage')
+    axes[0].grid(axis='y', alpha=0.3)
+    for i, v in enumerate(peak_mem):
+        axes[0].text(i, v, f'{v:.1f}', ha='center', va='bottom', fontweight='bold')
+
+    # Average memory
+    avg_mem = [metrics_data[s]['mem_usage_mb'].mean() for s in services]
+    axes[1].bar(services, avg_mem, color=[colors.get(s, '#95a5a6') for s in services])
+    axes[1].set_ylabel('Memory (MB)')
+    axes[1].set_title('Average Memory Usage')
+    axes[1].grid(axis='y', alpha=0.3)
+    for i, v in enumerate(avg_mem):
+        axes[1].text(i, v, f'{v:.1f}', ha='center', va='bottom', fontweight='bold')
+
+    # Memory efficiency (lower is better)
+    min_peak = min(peak_mem)
+    efficiency = [min_peak / p * 100 for p in peak_mem]
+    axes[2].bar(services, efficiency, color=[colors.get(s, '#95a5a6') for s in services])
+    axes[2].set_ylabel('Efficiency Score')
+    axes[2].set_title('Memory Efficiency (100 = best)')
+    axes[2].set_ylim([0, 110])
+    axes[2].grid(axis='y', alpha=0.3)
+    for i, v in enumerate(efficiency):
+        axes[2].text(i, v, f'{v:.0f}', ha='center', va='bottom', fontweight='bold')
+
+    plt.suptitle('Container Memory Analysis (OS-Level)', fontsize=16, fontweight='bold', y=1.02)
+    plt.tight_layout()
+    output_file = os.path.join(output_dir, 'memory_statistics.png')
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Created: {output_file}")
+
+    # 4. CPU Statistics Comparison
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+    # Peak CPU
+    peak_cpu = [metrics_data[s]['cpu_percent'].max() for s in services]
+    axes[0].bar(services, peak_cpu, color=[colors.get(s, '#95a5a6') for s in services])
+    axes[0].set_ylabel('CPU (%)')
+    axes[0].set_title('Peak CPU Usage')
+    axes[0].grid(axis='y', alpha=0.3)
+    for i, v in enumerate(peak_cpu):
+        axes[0].text(i, v, f'{v:.1f}', ha='center', va='bottom', fontweight='bold')
+
+    # Average CPU
+    avg_cpu = [metrics_data[s]['cpu_percent'].mean() for s in services]
+    axes[1].bar(services, avg_cpu, color=[colors.get(s, '#95a5a6') for s in services])
+    axes[1].set_ylabel('CPU (%)')
+    axes[1].set_title('Average CPU Usage')
+    axes[1].grid(axis='y', alpha=0.3)
+    for i, v in enumerate(avg_cpu):
+        axes[1].text(i, v, f'{v:.1f}', ha='center', va='bottom', fontweight='bold')
+
+    plt.suptitle('Container CPU Analysis (OS-Level)', fontsize=16, fontweight='bold', y=1.02)
+    plt.tight_layout()
+    output_file = os.path.join(output_dir, 'cpu_statistics.png')
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Created: {output_file}")
+
+    # 5. Resource Summary Table
+    summary_data = []
+    for service in services:
+        df = metrics_data[service]
+        summary_data.append({
+            'Service': service.upper(),
+            'Avg Memory (MB)': f"{df['mem_usage_mb'].mean():.1f}",
+            'Peak Memory (MB)': f"{df['mem_usage_mb'].max():.1f}",
+            'Avg CPU (%)': f"{df['cpu_percent'].mean():.1f}",
+            'Peak CPU (%)': f"{df['cpu_percent'].max():.1f}",
+            'PIDs': f"{df['pids'].mean():.0f}"
+        })
+
+    # Save summary as CSV
+    summary_df = pd.DataFrame(summary_data)
+    summary_file = os.path.join(results_dir, 'container_metrics_summary.csv')
+    summary_df.to_csv(summary_file, index=False)
+    print(f"Created: {summary_file}")
+
+    # Also create markdown table
+    markdown_file = os.path.join(results_dir, 'container_metrics_summary.md')
+    with open(markdown_file, 'w') as f:
+        f.write("# Container Resource Metrics Summary (OS-Level)\n\n")
+        f.write(summary_df.to_markdown(index=False))
+        f.write("\n\n*Metrics collected from container runtime (podman/docker stats)*\n")
+    print(f"Created: {markdown_file}")
 
 def main():
     if len(sys.argv) < 2:
@@ -328,6 +521,9 @@ def main():
     plot_radar_chart(df, output_dir)
     plot_memory_efficiency(df, output_dir)
 
+    # Generate OS-level container metrics visualizations
+    plot_container_metrics(results_dir, output_dir)
+
     print(f"\n✓ All visualizations saved to: {output_dir}")
     print("\nGenerated charts:")
     print("  - Latency comparison charts (per level)")
@@ -336,6 +532,10 @@ def main():
     print("  - Latency heatmap")
     print("  - Performance radar chart")
     print("  - Memory comparison (estimated)")
+    print("  - Container memory timeline (OS-level)")
+    print("  - Container CPU timeline (OS-level)")
+    print("  - Memory statistics comparison (OS-level)")
+    print("  - CPU statistics comparison (OS-level)")
 
 if __name__ == "__main__":
     main()
