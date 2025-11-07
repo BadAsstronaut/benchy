@@ -170,16 +170,16 @@ collect_service_metrics() {
 
                 # Convert to MB
                 case $mem_unit in
-                    KiB|KB) mem_usage=$(echo "scale=2; $mem_value / 1024" | bc) ;;
-                    MiB|MB) mem_usage=$mem_value ;;
-                    GiB|GB) mem_usage=$(echo "scale=2; $mem_value * 1024" | bc) ;;
+                    KiB|KB|kB) mem_usage=$(echo "scale=2; $mem_value / 1024" | bc) ;;
+                    MiB|MB|mB) mem_usage=$mem_value ;;
+                    GiB|GB|gB) mem_usage=$(echo "scale=2; $mem_value * 1024" | bc) ;;
                     *) mem_usage=$mem_value ;;
                 esac
 
                 case $limit_unit in
-                    KiB|KB) mem_limit=$(echo "scale=2; $limit_value / 1024" | bc) ;;
-                    MiB|MB) mem_limit=$limit_value ;;
-                    GiB|GB) mem_limit=$(echo "scale=2; $limit_value * 1024" | bc) ;;
+                    KiB|KB|kB) mem_limit=$(echo "scale=2; $limit_value / 1024" | bc) ;;
+                    MiB|MB|mB) mem_limit=$limit_value ;;
+                    GiB|GB|gB) mem_limit=$(echo "scale=2; $limit_value * 1024" | bc) ;;
                     *) mem_limit=$limit_value ;;
                 esac
             else
