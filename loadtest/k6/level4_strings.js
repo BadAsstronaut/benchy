@@ -57,8 +57,8 @@ export default function () {
   }
 
   // Test different string sizes and operations
-  const sizes = ['1kb', '10kb', '100kb'];  // Excluding 1mb for regular tests
-  const operations = ['reverse', 'uppercase', 'count', 'pattern'];
+  const sizes = ['10kb', '100kb', '1mb'];  // 10x memory intensity
+  const operations = ['reverse', 'uppercase', 'count', 'pattern', 'concatenate'];
 
   const size = sizes[Math.floor(Math.random() * sizes.length)];
   const operation = operations[Math.floor(Math.random() * operations.length)];

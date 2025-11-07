@@ -273,9 +273,12 @@ for test in "${TESTS[@]}"; do
         echo -e "${YELLOW}Waiting for service health...${NC}"
         if ! wait_for_health "$port"; then
             echo -e "${RED}✗ $service_name failed to become healthy${NC}"
-            $RUNTIME logs "$container_name"
-            cleanup_all
-            exit 1
+            echo -e "${YELLOW}Capturing logs and continuing...${NC}"
+            $RUNTIME logs "$container_name" > "$RESULTS_DIR/raw/${service}_${test}_${RUN_ID}_startup_failure.log" 2>&1 || true
+            $RUNTIME stop "$container_name" > /dev/null 2>&1 || true
+            $RUNTIME rm "$container_name" > /dev/null 2>&1 || true
+            echo -e "${YELLOW}Skipping to next service${NC}"
+            continue
         fi
         echo -e "${GREEN}✓ $service_name is healthy${NC}"
 
@@ -297,15 +300,16 @@ for test in "${TESTS[@]}"; do
         (collect_service_metrics "${service}_${test}" "$container_name" "$METRICS_DURATION" "load") &
         metrics_pid=$!
 
-        # Run k6 test (ignore exit code 99 which means thresholds failed - we still want the data)
+        # Run k6 test (capture all failures, including OOM-related crashes)
         echo -e "${YELLOW}  Test: $test${NC}"
         SERVICE=$service k6 run --out json="$RESULTS_DIR/raw/${service}_${test}_${RUN_ID}.json" --quiet "$K6_SCRIPT" > "$RESULTS_DIR/raw/${service}_${test}_${RUN_ID}.log" 2>&1 || {
             exit_code=$?
             if [ $exit_code -eq 99 ]; then
                 echo -e "${YELLOW}  ⚠ Thresholds failed (expected under heavy load)${NC}"
             else
-                echo -e "${RED}  ✗ K6 failed with exit code $exit_code${NC}"
-                exit $exit_code
+                echo -e "${RED}  ✗ K6 failed with exit code $exit_code (possible OOM or crash)${NC}"
+                echo -e "${YELLOW}  Capturing container logs and continuing...${NC}"
+                $RUNTIME logs "$container_name" > "$RESULTS_DIR/raw/${service}_${test}_${RUN_ID}_crash.log" 2>&1 || true
             fi
         }
 
