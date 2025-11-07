@@ -250,11 +250,7 @@ int main() {
                 while (ss >> word) {
                     // Convert to lowercase
                     transform(word.begin(), word.end(), word.begin(), ::tolower);
-                    // Remove punctuation
-                    word.erase(remove_if(word.begin(), word.end(), ::ispunct), word.end());
-                    if (!word.empty()) {
-                        wordFreq[word]++;
-                    }
+                    wordFreq[word]++;
                 }
 
                 // Get top 10 words

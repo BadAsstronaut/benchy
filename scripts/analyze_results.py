@@ -184,13 +184,17 @@ def main():
     for json_file in json_files:
         filename = os.path.basename(json_file)
 
-        # Extract service and level from filename
-        # Expected format: service_level_timestamp.json
+        # Extract service and test type from filename
+        # Standardized format: service_k6_RUNID.json OR service_levelN_xxx_RUNID.json
         parts = filename.replace('.json', '').split('_')
 
-        if len(parts) >= 2:
-            service = parts[0]
-            level = '_'.join(parts[1:-1])  # Handle multi-part level names
+        if len(parts) >= 3:
+            service = parts[0]  # First part is always service
+            # Second part determines test type (k6, level1, level2, etc)
+            if parts[1] == 'k6':
+                level = 'quick'  # k6 quick tests
+            else:
+                level = '_'.join(parts[1:-1])  # level tests, everything except service and run_id
 
             print(f"Processing: {service} - {level}")
 

@@ -193,41 +193,6 @@ def plot_performance_multipliers(df, output_dir):
     plt.close()
     print(f"Created: {output_file}")
 
-def plot_memory_efficiency(df, output_dir):
-    """Create memory efficiency comparison (placeholder - requires actual memory data)."""
-    # This will be populated when we have actual container memory metrics
-
-    fig, ax = plt.subplots(figsize=(12, 6))
-
-    # Placeholder data - will be replaced with actual metrics
-    services = ['Python', 'PHP', 'Go', 'C++']
-    idle_memory = [150, 120, 15, 8]  # Estimated MB
-    loaded_memory = [250, 200, 50, 30]  # Estimated MB
-
-    x = np.arange(len(services))
-    width = 0.35
-
-    ax.bar(x - width/2, idle_memory, width, label='Idle', color='#3498db', alpha=0.8)
-    ax.bar(x + width/2, loaded_memory, width, label='Under Load', color='#e74c3c', alpha=0.8)
-
-    ax.set_ylabel('Memory Usage (MB)', fontsize=12)
-    ax.set_title('Memory Usage Comparison (Estimated)', fontsize=14, fontweight='bold')
-    ax.set_xticks(x)
-    ax.set_xticklabels(services)
-    ax.legend()
-    ax.grid(axis='y', alpha=0.3)
-
-    # Add note about placeholder data
-    ax.text(0.5, 0.95, 'Note: Placeholder data - run benchmarks for actual metrics',
-            transform=ax.transAxes, ha='center', va='top',
-            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5),
-            fontsize=9)
-
-    plt.tight_layout()
-    output_file = os.path.join(output_dir, 'memory_comparison_estimated.png')
-    plt.savefig(output_file, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"Created: {output_file}")
 
 def plot_radar_chart(df, output_dir):
     """Create radar chart for multi-dimensional comparison."""
@@ -324,9 +289,9 @@ def plot_container_metrics(results_dir, output_dir):
         print(f"No metrics directory found at {metrics_dir}")
         return
 
-    # Find all metrics CSV files
+    # Find all metrics CSV files (standardized naming: service_phase_runid.csv)
     import glob
-    metrics_files = glob.glob(os.path.join(metrics_dir, "*_metrics_*.csv"))
+    metrics_files = glob.glob(os.path.join(metrics_dir, "*_load_*.csv"))
 
     if not metrics_files:
         print("No container metrics CSV files found")
@@ -338,8 +303,12 @@ def plot_container_metrics(results_dir, output_dir):
     metrics_data = {}
     for file_path in metrics_files:
         filename = os.path.basename(file_path)
-        # Extract service name (e.g., "python_metrics_20231105_123456.csv" -> "python")
-        service = filename.split('_metrics_')[0]
+        # Standardized naming: service_load_RUNID.csv
+        parts = filename.replace('.csv', '').split('_')
+        if len(parts) >= 2:
+            service = parts[0]  # First part is always the service name
+        else:
+            continue
 
         try:
             df = pd.read_csv(file_path)
@@ -519,7 +488,6 @@ def main():
     plot_performance_multipliers(df, output_dir)
     plot_latency_heatmap(df, output_dir)
     plot_radar_chart(df, output_dir)
-    plot_memory_efficiency(df, output_dir)
 
     # Generate OS-level container metrics visualizations
     plot_container_metrics(results_dir, output_dir)
@@ -531,7 +499,6 @@ def main():
     print("  - Performance multipliers")
     print("  - Latency heatmap")
     print("  - Performance radar chart")
-    print("  - Memory comparison (estimated)")
     print("  - Container memory timeline (OS-level)")
     print("  - Container CPU timeline (OS-level)")
     print("  - Memory statistics comparison (OS-level)")

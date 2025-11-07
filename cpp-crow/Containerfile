@@ -1,15 +1,18 @@
 # Multi-stage build for C++ Crow
-FROM gcc:12 AS builder
+FROM alpine:latest AS builder
 
 WORKDIR /build
 
-# Install CMake, git and dependencies
-RUN apt-get update && apt-get install -y \
+# Install build dependencies
+RUN apk add --no-cache \
+    g++ \
+    gcc \
     cmake \
+    make \
     git \
     python3 \
-    libasio-dev \
-    && rm -rf /var/lib/apt/lists/*
+    asio-dev \
+    linux-headers
 
 # Clone Crow and generate amalgamated header
 RUN git clone https://github.com/CrowCpp/Crow.git && \
@@ -28,12 +31,13 @@ RUN mkdir build && cd build && \
     cmake -DCMAKE_BUILD_TYPE=Release .. && \
     cmake --build . --config Release
 
-# Final stage - minimal image with glibc compatibility
-FROM debian:bookworm-slim
+# Final stage - minimal Alpine runtime
+FROM alpine:latest
 
-RUN apt-get update && apt-get install -y \
-    libstdc++6 \
-    && rm -rf /var/lib/apt/lists/*
+# Install runtime dependencies only
+RUN apk add --no-cache \
+    libstdc++ \
+    libgcc
 
 WORKDIR /app
 
